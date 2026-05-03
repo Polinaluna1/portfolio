@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages with Tests
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  test:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Завантаження коду
+        uses: actions/checkout@v4
+
+      - name: Налаштування Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Встановлення залежностей
+        run: npm ci
+
+      - name: Встановлення браузерів Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Запуск E2E тестів
+        run: npx playwright test
+
+      - name: Збереження звіту Playwright
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 10
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: test
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Завантаження коду
+        uses: actions/checkout@v4
+
+      - name: Налаштування GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Завантаження артефактів для Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Деплой на GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
